@@ -1,0 +1,40 @@
+<boards>
+  <board>
+    <id>PSOC6-GENERIC</id>
+    <category>PSoC 6 BSPs</category>
+    <board_uri>https://github.com/cypresssemiconductorco/TARGET_PSOC6-GENERIC</board_uri>
+    <chips>
+      <mcu>CY8C6347BZI-BLD53</mcu>
+    </chips>
+    <name>PSOC6-GENERIC</name>
+    <summary>This board support package is intended for creating custom PSoC 6 BSPs.</summary>
+    <prov_capabilities>psoc6 mcu_gp</prov_capabilities>
+    <!-- Here are the capabilities that are used by ModusToolbox that can be enabled in the BSP -->
+    <!--prov_capabilities>psoc6 cyw43xxx mcu_gp std_crypto udb secure_boot arduino j2 ble bt wifi usb_device usb_host capsense capsense_button capsense_linear_slider capsense_radial_slider capsense_touchpad sdhc qspi memory led rgb_led switch memory_qspi nor_flash smart_io pdm i2s</prov_capabilities-->
+    <description><![CDATA[
+        <div class="category">Kit Features:</div><ul>
+        <li>This is a generic template, there is no corresponding physical board</li>
+        <li>This manifest can also be used to allow the board to show up in the ModusToolbox tools</li>
+        </ul><p/>
+
+        <div class="category">Kit Contents:</div><ul>
+        <li>NA</li>
+        </ul>
+    ]]></description>
+    <documentation_url>https://github.com/cypresssemiconductorco/TARGET_PSOC6-GENERIC</documentation_url>
+    <versions>
+      <version tools_min_version="2.2.0" flow_version="1.0,2.0" prov_capabilities_per_version="bsp_gen2">
+        <num>Latest 2.X release</num>
+        <commit>latest-v2.X</commit>
+      </version>
+      <version tools_min_version="2.2.0" flow_version="1.0,2.0" prov_capabilities_per_version="bsp_gen2">
+        <num>2.0.0 release</num>
+        <commit>release-v2.0.0</commit>
+      </version>
+      <version tools_min_version="2.2.0" flow_version="1.0,2.0" prov_capabilities_per_version="bsp_gen2">
+        <num>Development build</num>
+        <commit>develop</commit>
+      </version>
+    </versions>
+  </board>
+</boards>
