@@ -20,6 +20,8 @@
 #include "math.h"
 #include "time.h"
 
+//#define SYSTEM_SHUT_DOWN
+
 extern void handle_error(void);
 
 /*Modem global variables storage*/
@@ -27,11 +29,18 @@ modem_data_storage_t modem_data;
 
 /*AT parser variables storage*/
 extern TSCPHandler   SCPHandler;
-/*Arduino UART object*/
+
+/*Arduino UART imported variables*/
 extern cyhal_uart_t ardu_uart;
+extern uint8_t aRxBuffer;
+
+/*ADC DMA imported variables*/
 extern uint16_t aADCdata[2];
 
-extern uint8_t aRxBuffer;
+/*RTC variables*/
+#ifdef SYSTEM_SHUT_DOWN
+extern cyhal_rtc_t rtc_obj;
+#endif
 
 /*Telit Portal Authentication Templates*/
 const char fcmd_HTTPPOST[] ="POST /api HTTP/1.0\r\nHost: api-de.devicewise.com\r\nContent-Type: application/json\r\nContent-Length:";
@@ -146,70 +155,6 @@ static double nmea2dec(char *nmea, char type, char *dir)
       return dec;
     else
       return -1 * dec;
-}
-
-void ShutDown(uint32_t seconds)
-{
-#if 0
-  RTC_TimeTypeDef CurrentTime = {0};
-  RTC_DateTypeDef CurrentDate = {0};
-  RTC_AlarmTypeDef NewAlarm = {0};
-  time_t UnixTime = {0};
-  struct tm tim = {0};
-  volatile uint8_t wdayconvfw[8] = {0,1,2,3,4,5,6,0};
-  volatile uint8_t wdayconvbw[7] = {7,1,2,3,4,5,6};
-
-  /* Get the RTC current Time */
-  if((HAL_RTC_GetTime(hrtc, &CurrentTime, RTC_FORMAT_BIN)) != HAL_OK)
-  {
-    return;
-  }
-  /* Get the RTC current Date */
-  if((HAL_RTC_GetDate(hrtc, &CurrentDate, RTC_FORMAT_BIN)) != HAL_OK)
-  {
-    return;
-  }
-
-  /*Prepare for time conversion to Unix format*/
-  tim.tm_isdst = CurrentTime.DayLightSaving;
-  tim.tm_year = (uint16_t)(CurrentDate.Year+2000-1900);
-  tim.tm_mon = CurrentDate.Month-1;
-  tim.tm_wday = wdayconvfw[CurrentDate.WeekDay];
-  tim.tm_mday = CurrentDate.Date;
-  tim.tm_hour = CurrentTime.Hours;
-  tim.tm_min = CurrentTime.Minutes;
-  tim.tm_sec = CurrentTime.Seconds;
-  UnixTime = mktime(&tim);
-
-  /*Add time in seconds here*/
-  UnixTime = UnixTime + seconds;
-  /*Convert back*/
-  tim = *(localtime(&UnixTime));
-
-  /* Enable the Alarm A */
-  NewAlarm.AlarmTime.Hours = tim.tm_hour;
-  NewAlarm.AlarmTime.Minutes = tim.tm_min;
-  NewAlarm.AlarmTime.Seconds = tim.tm_sec;
-  NewAlarm.AlarmTime.SubSeconds = 0;
-  NewAlarm.AlarmTime.DayLightSaving = CurrentTime.DayLightSaving;
-  NewAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
-  NewAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY;
-  NewAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
-  NewAlarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_WEEKDAY;
-  NewAlarm.AlarmDateWeekDay = wdayconvbw[tim.tm_wday];
-  NewAlarm.Alarm = RTC_ALARM_A;
-
-  if (HAL_RTC_SetAlarm_IT(hrtc, &NewAlarm, RTC_FORMAT_BIN) != HAL_OK)
-  {
-    return;
-  }
-
-  /*Save flags to Backup register to be able to detect shut down*/
-  HAL_RTCEx_BKUPWrite(hrtc, BACKUP_REG_NO, BACKUP_REG_VALUE);
-  /*Shut Down*/
-  HAL_PWREx_EnterSHUTDOWNMode();
-
-#endif
 }
 
 void *memmem(const void *l, size_t l_len, const void *s, size_t s_len)
@@ -847,7 +792,7 @@ static _Bool TelitPortalAuthenticate(void)
     SCP_SendData(post_buff, strlen(post_buff));
 
     /* Wait for full answer */
-    result = SCP_WaitForAnswer("}}}", 15000);
+    result = SCP_WaitForAnswer("}}}", 30000);
     if (result)
     {
         /* Getting session id */
@@ -864,7 +809,7 @@ static _Bool TelitPortalAuthenticate(void)
             {
                 /* We should wait for the server to shut down the connection */
                 result = NULL;
-                result = SCP_WaitForAnswer("NO CARRIER", 10000);
+                result = SCP_WaitForAnswer("NO CARRIER", 20000);
                 if(result)
                 {
                     ModemCloseTcpSocket();
@@ -986,12 +931,12 @@ static _Bool TelitPortalPostData(void)
     printf("\n\rUPLOADING:\n\r%s\n\r", post_buff);
     vTaskDelay(pdMS_TO_TICKS(1000));
 
-    result = SCP_WaitForAnswer("}}", 15000);
+    result = SCP_WaitForAnswer("}}", 30000);
     if (result)
     {
       /* We should wait for the server to shut down the connection */
       result = NULL;
-      result = SCP_WaitForAnswer("NO CARRIER", 10000);
+      result = SCP_WaitForAnswer("NO CARRIER", 20000);
       if(result)
       {
         ModemCloseTcpSocket();
@@ -1091,12 +1036,12 @@ static _Bool TelitPortalPostData(void)
     printf("\n\rUPLOADING:\n\r%s\n\r", post_buff);
     vTaskDelay(pdMS_TO_TICKS(1000));
 
-    result = SCP_WaitForAnswer("}}", 10000);
+    result = SCP_WaitForAnswer("}}",20000);
     if (result)
     {
       /* We should wait for the server to shut down the connection */
       result = NULL;
-      result = SCP_WaitForAnswer("NO CARRIER", 10000);
+      result = SCP_WaitForAnswer("NO CARRIER", 20000);
       if(result)
       {
         ModemCloseTcpSocket();
@@ -1112,10 +1057,10 @@ static _Bool TelitPortalPostData(void)
 
 upload_error_t TelitCloudUpload(void)
 {
-  _Bool authenticated = false; /*have this as 'static' for constant power-on operation*/
+  _Bool authenticated = false;
   _Bool result = false;
   char * scp_result = NULL;
-  upload_error_t return_error = UPLOAD_OK;
+  volatile upload_error_t return_error = UPLOAD_OK;
 
   printf("Telit Cloud Upload Procedure Started.\n\r");
 
@@ -1203,8 +1148,8 @@ upload_error_t TelitCloudUpload(void)
   if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+CGDCONT=1,\"IP\",\"lpwa.telia.iot\"\r\n", "OK", 2000, 1);
 
   /*Network Support Setup*/
-  if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46?\r\n", "+WS46: 30", 1000, 1);
-  if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46=30\r\n", "OK", 1000, 1);
+  if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46?\r\n", "+WS46: 28", 1000, 1);
+  if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46=28\r\n", "OK", 1000, 1);
   if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT#WS46?\r\n", "#WS46: 3", 1000, 1);
   if (!scp_result)
   {
@@ -1277,7 +1222,6 @@ upload_error_t TelitCloudUpload(void)
   else
   {
     modem_data.context = 0;
-    authenticated = false;
     return_error = CLOUD_AUTH_ERROR;
     goto error_exit;
   }
@@ -1285,46 +1229,31 @@ upload_error_t TelitCloudUpload(void)
   /*Start uploading*/
   cyhal_gpio_write(LED1, CYBSP_LED_STATE_ON);
 
-  /*Authenticate only once per session*/
-  if(!authenticated)
+  /*Authenticate*/
+  result = ModemOpenTcpSocket("api-de.devicewise.com", 80);
+  if(result)
   {
-    /*Authenticate */
-  Authentication:
-    result = ModemOpenTcpSocket("api-de.devicewise.com", 80);
-    if(result)
-    {
-      authenticated = TelitPortalAuthenticate();
-    }
-    /*Post*/
-    if(authenticated)
-    {
-      result = ModemOpenTcpSocket("api-de.devicewise.com", 80);
+	  authenticated = TelitPortalAuthenticate();
+  }
+
+  vTaskDelay(pdMS_TO_TICKS(5000));
+
+  /*Post*/
+  if(authenticated)
+  {
+	  result = ModemOpenTcpSocket("api-de.devicewise.com", 80);
       if (result)
       {
         authenticated = TelitPortalPostData();
       }
-    }
-    if(!result)
-    {
-      cyhal_gpio_write(LED1, CYBSP_LED_STATE_OFF);
-      ContextDeactivation();
-      goto error_exit;
-    }
   }
-  else
+
+  /*Check the results*/
+  if(!result || !authenticated)
   {
-    /*Post*/
-    result = ModemOpenTcpSocket("api-de.devicewise.com", 80);
-    if (result)
-    {
-      authenticated = TelitPortalPostData();
-    }
-    /*If post fails try to authenticate*/
-    else
-    {
-      authenticated = false;
-      goto Authentication;
-    }
+      ContextDeactivation();
+      return_error = CLOUD_AUTH_ERROR;
+      goto error_exit;
   }
 
   /*Turn off LED1*/
@@ -1698,34 +1627,23 @@ void ModemTask(void *param)
 	printf("Modem Task Started.\n\r");
 
 #ifdef SYSTEM_SHUT_DOWN
-  /*Upload*/
-  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+    /*Clear all old data*/
+    memset(modem_data.gps_latitude,0x00,sizeof(modem_data.gps_latitude));
+    memset(modem_data.gps_longitude,0x00,sizeof(modem_data.gps_longitude));
+    memset(modem_data.gps_altitude,0x00,sizeof(modem_data.gps_altitude));
+    memset(modem_data.gps_precision,0x00,sizeof(modem_data.gps_precision));
+    memset(modem_data.gps_course,0x00,sizeof(modem_data.gps_course));
+    memset(modem_data.gps_speed,0x00,sizeof(modem_data.gps_speed));
+    GNSSFixLocation(60,modem_data.gps_latitude,modem_data.gps_longitude,modem_data.gps_speed,modem_data.gps_course, modem_data.gps_altitude, modem_data.gps_precision);
 
-  GNSSFixLocation(
-		  60,
-		  modem_data.gps_latitude,
-		  modem_data.gps_longitude,
-		  modem_data.gps_speed,
-		  modem_data.gps_course
-		  );
-
-  /*Some data is not used in the demo*/
-  strcpy(modem_data.gps_altitude, "0.0");
-  strcpy(modem_data.gps_precision,"0.0");
-  if(strlen(modem_data.gps_course) == 0)
-  {
-	  strcpy(modem_data.gps_course,"0.0");
-  }
-
-
-  return_error = TelitCloudUpload();
-  while(return_error != UPLOAD_OK)
-  {
     return_error = TelitCloudUpload();
-  }
+  	while(return_error != UPLOAD_OK)
+  	{
+  		return_error = TelitCloudUpload();
+  	}
 
-  /*Shut Down, system will Reset at wake-up*/
-  ShutDown(&hrtc, 60);
+  	/*Shut Down, system will Reset at wake-up*/
+  	Hibernate(&rtc_obj, 60);
 #endif
 
 #ifdef SEND_SMS

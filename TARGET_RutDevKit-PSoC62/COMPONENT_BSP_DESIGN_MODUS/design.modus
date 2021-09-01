@@ -606,6 +606,11 @@
                         <Param id="divider" value="1"/>
                     </Personality>
                 </Block>
+                <Block location="srss[0].clock[0].ilo[0]">
+                    <Personality template="mxs40ilo" version="1.0">
+                        <Param id="hibernate" value="true"/>
+                    </Personality>
+                </Block>
                 <Block location="srss[0].clock[0].imo[0]">
                     <Personality template="mxs40imo" version="1.0">
                         <Param id="trim" value="1"/>

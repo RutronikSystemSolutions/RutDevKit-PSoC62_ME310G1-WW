@@ -24,7 +24,7 @@ typedef struct
 
 typedef struct
 {
-    int64_t             timer;
+	volatile uint32_t            timer;
     uint32_t            RxIndex;
     uint8_t             RxBuffer[SCP_RX_BUFF_LENGTH];
     TSCPCallBack        scpCallbacks[SCP_CMD_BUFF_LENGTH];

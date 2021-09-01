@@ -61,7 +61,8 @@
 #include "StringCommandParser.h"
 #include "modem.h"
 
-#define UART_RX_PRIO	2
+#define UART_RX_PRIO				2
+#define RTC_INTERRUPT_PRIORITY		0
 
 static void isr_scp_timer(void *callback_arg, cyhal_timer_event_t event);
 static cy_rslt_t scp_timer_init(void);
@@ -69,6 +70,7 @@ static cy_rslt_t ardu_uart_init();
 void ardu_uart_isr(void *handler_arg, cyhal_uart_event_t event);
 static cy_rslt_t adc_hw_init(void);
 void dma_interrupt(void);
+cy_rslt_t Hibernate(cyhal_rtc_t *obj, uint32_t seconds);
 void handle_error(void);
 
 /*SCP Timer object */
@@ -78,6 +80,8 @@ cyhal_timer_t scp_timer;
 cyhal_uart_t ardu_uart;
 
 uint8_t aRxBuffer;
+
+cyhal_rtc_t rtc_obj;
 
 /* This flag set in the DMA interrupt handler */
 volatile bool dmaIntrTriggered = false;
@@ -144,6 +148,11 @@ int main(void)
     {handle_error();}
     printf("\x1b[2J\x1b[;H");
     printf("RutDevKit-PSoC62 ME310G1-WW Application.\r\n");
+
+    /* Initialize RTC */
+    result = cyhal_rtc_init(&rtc_obj);
+    if (CY_RSLT_SUCCESS != result)
+    {handle_error();}
 
     /*Initialize String Command Parser Timer*/
     result = scp_timer_init();
@@ -235,10 +244,11 @@ void ardu_uart_isr(void *handler_arg, cyhal_uart_event_t event)
         /* An error occurred in Tx */
         /* Insert application code to handle Tx error */
     }
-    else if ((event & CYHAL_UART_IRQ_TX_DONE) == CYHAL_UART_IRQ_TX_DONE)
+    else if ((event & CYHAL_UART_IRQ_RX_ERROR) == CYHAL_UART_IRQ_RX_ERROR)
     {
-        /* All Tx data has been transmitted */
-        /* Insert application code to handle Tx done */
+        /* An error occurred in Rx */
+        /* Insert application code to handle Rx error */
+    	cyhal_uart_read_async(&ardu_uart, (void *)&aRxBuffer, 1);
     }
     else if ((event & CYHAL_UART_IRQ_RX_DONE) == CYHAL_UART_IRQ_RX_DONE)
     {
@@ -267,13 +277,14 @@ static cy_rslt_t ardu_uart_init(void)
 	if (result != CY_RSLT_SUCCESS)
 	{return result;}
 
+	/*Connect internal pull-up resistors*/
 	cyhal_gpio_configure(ARDU_RX, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_PULLUP);
 
     /* The UART callback handler registration */
     cyhal_uart_register_callback(&ardu_uart, ardu_uart_isr, NULL);
 
     /* Enable required UART events */
-    cyhal_uart_enable_event(&ardu_uart, (cyhal_uart_event_t)(CYHAL_UART_IRQ_TX_DONE | CYHAL_UART_IRQ_TX_ERROR | CYHAL_UART_IRQ_RX_DONE), UART_RX_PRIO, true);
+    cyhal_uart_enable_event(&ardu_uart, (cyhal_uart_event_t)(CYHAL_UART_IRQ_RX_ERROR | CYHAL_UART_IRQ_TX_ERROR | CYHAL_UART_IRQ_RX_DONE), UART_RX_PRIO, true);
 
 	return result;
 }
@@ -364,7 +375,55 @@ void dma_interrupt(void)
 
     /* Clear SAR DMA interrupt */
     Cy_DMA_Channel_ClearInterrupt(cpuss_0_dw0_0_chan_28_HW, cpuss_0_dw0_0_chan_28_CHANNEL);
- }
+}
+
+/*Hibernate Function*/
+cy_rslt_t Hibernate(cyhal_rtc_t *obj, uint32_t seconds)
+{
+	cy_rslt_t result;
+	struct tm date_time;
+    time_t UnixTime = {0};
+
+	/*Set the time fields to trigger an alarm event.*/
+	cyhal_alarm_active_t alarm_active =
+	{
+		    alarm_active.en_sec = 1,
+		    alarm_active.en_min = 1,
+		    alarm_active.en_hour = 1,
+		    alarm_active.en_day = 1,
+		    alarm_active.en_date = 1,
+		    alarm_active.en_month = 1
+	};
+
+	result = cyhal_rtc_read(obj, &date_time);
+    if (CY_RSLT_SUCCESS != result)
+    {return result;}
+
+    /*Get time in Unix format*/
+    UnixTime = mktime(&date_time);
+
+    /*Add time in seconds here*/
+    UnixTime = UnixTime + seconds;
+    /*Convert back*/
+    date_time = *(localtime(&UnixTime));
+
+    /*Set the alarm*/
+    result = cyhal_rtc_set_alarm(obj, &date_time, alarm_active);
+    if (CY_RSLT_SUCCESS != result)
+    {return result;}
+
+    /* Enable the alarm event to trigger an interrupt */
+    cyhal_rtc_enable_event(obj, CYHAL_RTC_ALARM, RTC_INTERRUPT_PRIORITY, true);
+
+    /* Put the system into a hibernate state. Most of the system will stop. */
+    result = cyhal_syspm_hibernate(CYHAL_SYSPM_HIBERNATE_RTC_ALARM);
+    if (CY_RSLT_SUCCESS != result)
+    {return result;}
+
+
+    /*Should never reach this*/
+    return result;
+}
 
 void handle_error(void)
 {

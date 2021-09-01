@@ -81,6 +81,6 @@ void ModemTask(void *param);
 void URCReceiverTask(void *param);
 void SCP_Tick_Callback(void);
 void *memmem(const void *l, size_t l_len, const void *s, size_t s_len);
-void ShutDown(uint32_t seconds);
+extern cy_rslt_t Hibernate(cyhal_rtc_t *obj, uint32_t seconds);
 
 #endif /* MODEM_H_ */
