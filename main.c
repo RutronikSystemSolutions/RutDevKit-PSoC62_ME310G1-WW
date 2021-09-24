@@ -62,7 +62,7 @@
 #include "modem.h"
 
 #define UART_RX_PRIO				2
-#define RTC_INTERRUPT_PRIORITY		0
+#define RTC_INTERRUPT_PRIORITY		7
 
 static void isr_scp_timer(void *callback_arg, cyhal_timer_event_t event);
 static cy_rslt_t scp_timer_init(void);
@@ -79,8 +79,10 @@ cyhal_timer_t scp_timer;
 /*Arduino UART object*/
 cyhal_uart_t ardu_uart;
 
-uint8_t aRxBuffer;
+/*Arduino UART reception variable*/
+uint8_t RxByte;
 
+/*RTC Object*/
 cyhal_rtc_t rtc_obj;
 
 /* This flag set in the DMA interrupt handler */
@@ -98,6 +100,7 @@ const cy_stc_sysint_t intRxDma_cfg =
 /* Buffer to store data from SAR using DMA */
 int16_t aADCdata[2] = {0};
 
+/*FreeRTOS task handle*/
 TaskHandle_t URCReceiverTaskHandle = NULL;
 SemaphoreHandle_t cmd_mutex = NULL;
 
@@ -248,13 +251,13 @@ void ardu_uart_isr(void *handler_arg, cyhal_uart_event_t event)
     {
         /* An error occurred in Rx */
         /* Insert application code to handle Rx error */
-    	cyhal_uart_read_async(&ardu_uart, (void *)&aRxBuffer, 1);
+    	cyhal_uart_read_async(&ardu_uart, (void *)&RxByte, 1);
     }
     else if ((event & CYHAL_UART_IRQ_RX_DONE) == CYHAL_UART_IRQ_RX_DONE)
     {
         /* All Rx data has been received */
-    	SCP_ByteReceived(aRxBuffer);
-    	cyhal_uart_read_async(&ardu_uart, (void *)&aRxBuffer, 1);
+    	SCP_ByteReceived(RxByte);
+    	cyhal_uart_read_async(&ardu_uart, (void *)&RxByte, 1);
     }
 }
 

@@ -32,7 +32,7 @@ extern TSCPHandler   SCPHandler;
 
 /*Arduino UART imported variables*/
 extern cyhal_uart_t ardu_uart;
-extern uint8_t aRxBuffer;
+extern uint8_t RxByte;
 
 /*ADC DMA imported variables*/
 extern uint16_t aADCdata[2];
@@ -69,7 +69,7 @@ char post_length[16];
 char sms_buff[100];
 char incoming_number[20];
 _Bool msg_sts = false;
-const char phone_number[]  = "+37069683975";
+const char phone_number[]  = "xxxxxxxx";
 const char google_link[] ="http://maps.google.com/maps?q=%s,%s";
 
 /*Modem Task Attributes*/
@@ -1078,7 +1078,7 @@ upload_error_t TelitCloudUpload(void)
   if(!scp_result)
   {
 	vTaskDelay(pdMS_TO_TICKS(5000));
-    cyhal_uart_read_async(&ardu_uart, (void *)&aRxBuffer, 1);
+    cyhal_uart_read_async(&ardu_uart, (void *)&RxByte, 1);
     scp_result = NULL;
     scp_result = SCP_SendCommandWaitAnswer("AT\r\n", "OK", 200, 1);
     if(!scp_result)
@@ -1304,7 +1304,7 @@ static gnss_error_t GNSSFixLocation(uint32_t timeout, char*lat, char*lon, char*s
 	  if(!result)
 	  {
 		vTaskDelay(pdMS_TO_TICKS(5000));
-	    cyhal_uart_read_async(&ardu_uart, (void *)&aRxBuffer, 1);
+	    cyhal_uart_read_async(&ardu_uart, (void *)&RxByte, 1);
 	    result = NULL;
 	    result = SCP_SendCommandWaitAnswer("AT\r\n", "OK", 200, 1);
 	    if(!result)
@@ -1321,7 +1321,7 @@ static gnss_error_t GNSSFixLocation(uint32_t timeout, char*lat, char*lon, char*s
 		  	SCP_SendCommandWaitAnswer("AT$GPSCFG=0,0\r\n", "OK", 1000, 1);
 		  	SCP_SendCommandWaitAnswer("AT#REBOOT\r\n", "OK", 1000, 1);
 		  	vTaskDelay(pdMS_TO_TICKS(5000));
-		  	cyhal_uart_read_async(&ardu_uart, (void *)&aRxBuffer, 1);
+		  	cyhal_uart_read_async(&ardu_uart, (void *)&RxByte, 1);
 		    result = NULL;
 		    result = SCP_SendCommandWaitAnswer("AT\r\n", "OK", 200, 1);
 		    if(!result)
@@ -1475,7 +1475,7 @@ static upload_error_t SendSMS(void)
     /*No response to AT, Retry*/
     if(!scp_result)
     {
-    	cyhal_uart_read_async(&ardu_uart, (void *)&aRxBuffer, 1);
+    	cyhal_uart_read_async(&ardu_uart, (void *)&RxByte, 1);
       for(i=0; i<50; i++)
       {
     	  vTaskDelay(pdMS_TO_TICKS(100));
@@ -1623,10 +1623,21 @@ void ModemTask(void *param)
 	(void) param;
 	static uint32_t cloud_time_counter = TELIT_CLOUD_UPDATE_INTERVAL;
 	upload_error_t return_error;
+	cy_rslt_t result;
 
 	printf("Modem Task Started.\n\r");
 
 #ifdef SYSTEM_SHUT_DOWN
+	cyhal_gpio_write(LED1, CYBSP_LED_STATE_ON);
+	vTaskDelay(pdMS_TO_TICKS(1000));
+	cyhal_gpio_write(LED1, CYBSP_LED_STATE_OFF);
+	result = Hibernate(&rtc_obj, 60);
+    if (CY_RSLT_SUCCESS != result)
+    {
+    	printf("Failed to enter the system hibernation.\r\n");
+        handle_error();
+    }
+
     /*Clear all old data*/
     memset(modem_data.gps_latitude,0x00,sizeof(modem_data.gps_latitude));
     memset(modem_data.gps_longitude,0x00,sizeof(modem_data.gps_longitude));
@@ -1643,7 +1654,12 @@ void ModemTask(void *param)
   	}
 
   	/*Shut Down, system will Reset at wake-up*/
-  	Hibernate(&rtc_obj, 60);
+  	result = Hibernate(&rtc_obj, 60);
+    if (CY_RSLT_SUCCESS != result)
+    {
+    	printf("Failed to enter the system hibernation.\r\n");
+        handle_error();
+    }
 #endif
 
 #ifdef SEND_SMS

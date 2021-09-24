@@ -96,7 +96,8 @@ SOURCES=
 INCLUDES=
 
 # Add additional defines to the build process (without a leading -D).
-DEFINES=
+DEFINES += COMPONENT_CAT1
+DEFINES += COMPONENT_CAT1A
 
 # Select softfp or hardfp floating point. Default is softfp.
 VFP_SELECT=

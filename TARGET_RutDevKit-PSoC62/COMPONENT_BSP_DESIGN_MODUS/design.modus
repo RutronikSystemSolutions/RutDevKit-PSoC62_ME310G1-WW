@@ -513,7 +513,7 @@
                 </Block>
                 <Block location="peri[0].div_16[7]">
                     <Personality template="mxs40peripheralclock" version="1.0">
-                        <Param id="intDivider" value="16"/>
+                        <Param id="intDivider" value="8"/>
                         <Param id="fracDivider" value="0"/>
                         <Param id="startOnReset" value="true"/>
                     </Personality>
@@ -570,10 +570,7 @@
                 <Block location="srss[0].clock[0].fll[0]">
                     <Personality template="mxs40fll" version="2.0">
                         <Param id="configuration" value="auto"/>
-                        <Param id="desiredFrequency" value=""/>
-                        <Param id="multiplier" value=""/>
-                        <Param id="reference" value=""/>
-                        <Param id="tolerance" value=""/>
+                        <Param id="desiredFrequency" value="50.000"/>
                     </Personality>
                 </Block>
                 <Block location="srss[0].clock[0].hfclk[0]">
@@ -648,14 +645,14 @@
                 </Block>
                 <Block location="srss[0].clock[0].periclk[0]">
                     <Personality template="mxs40periclk" version="1.0">
-                        <Param id="divider" value="1"/>
+                        <Param id="divider" value="2"/>
                     </Personality>
                 </Block>
                 <Block location="srss[0].clock[0].pll[0]">
                     <Personality template="mxs40pll" version="2.0">
                         <Param id="lowFrequencyMode" value="false"/>
                         <Param id="configuration" value="auto"/>
-                        <Param id="desiredFrequency" value="96.000"/>
+                        <Param id="desiredFrequency" value="50.000"/>
                         <Param id="optimization" value="MinPower"/>
                     </Personality>
                 </Block>
@@ -690,11 +687,11 @@
                 <Block location="srss[0].power[0]">
                     <Personality template="mxs40power" version="1.3">
                         <Param id="pwrMode" value="LDO_1_1"/>
-                        <Param id="actPwrMode" value="LP"/>
-                        <Param id="coreRegulator" value="CY_SYSPM_BUCK_MODE_NORMAL"/>
+                        <Param id="actPwrMode" value="ULP"/>
+                        <Param id="coreRegulator" value="CY_SYSPM_BUCK_MODE_MIN"/>
                         <Param id="pmicEnable" value="false"/>
                         <Param id="backupSrc" value="VDDD"/>
-                        <Param id="idlePwrMode" value="CY_CFG_PWR_MODE_DEEPSLEEP"/>
+                        <Param id="idlePwrMode" value="CY_CFG_PWR_MODE_SLEEP"/>
                         <Param id="deepsleepLatency" value="0"/>
                         <Param id="vddaMv" value="3300"/>
                         <Param id="vdddMv" value="3300"/>
