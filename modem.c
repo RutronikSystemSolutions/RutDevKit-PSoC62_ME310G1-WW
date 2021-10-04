@@ -1623,11 +1623,11 @@ void ModemTask(void *param)
 	(void) param;
 	static uint32_t cloud_time_counter = TELIT_CLOUD_UPDATE_INTERVAL;
 	upload_error_t return_error;
-	cy_rslt_t result;
 
 	printf("Modem Task Started.\n\r");
 
 #ifdef SYSTEM_SHUT_DOWN
+	cy_rslt_t result;
 	cyhal_gpio_write(LED1, CYBSP_LED_STATE_ON);
 	vTaskDelay(pdMS_TO_TICKS(1000));
 	cyhal_gpio_write(LED1, CYBSP_LED_STATE_OFF);
