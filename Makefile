@@ -121,7 +121,7 @@ CXXFLAGS=
 ASFLAGS=
 
 # Additional / custom linker flags.
-LDFLAGS=
+LDFLAGS += -Wl,--undefined=uxTopUsedPriority
 
 # Additional / custom libraries to link in to the application.
 LDLIBS=
