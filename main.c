@@ -1,7 +1,7 @@
 /******************************************************************************
 * File Name:   main.c
 *
-* Description: This is the source code for the RutDevKit-PSoC62_I2C_Scanner
+* Description: This is the source code for the RutDevKit-PSoC62_ME310G1-WW
 *              Application for ModusToolbox.
 *
 * Related Document: See README.md
