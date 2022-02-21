@@ -276,7 +276,7 @@ static cy_rslt_t ardu_uart_init(void)
     };
 
     /* Initialize the UART Block */
-    result = cyhal_uart_init(&ardu_uart, ARDU_TX, ARDU_RX, NULL, &uart_config);
+    result = cyhal_uart_init(&ardu_uart, ARDU_TX, ARDU_RX, NC, NC, NULL, &uart_config);
 	if (result != CY_RSLT_SUCCESS)
 	{return result;}
 

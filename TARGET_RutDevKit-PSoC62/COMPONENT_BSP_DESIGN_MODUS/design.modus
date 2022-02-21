@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Design version="12" xmlns="http://cypress.com/xsd/cydesignfile_v3">
-    <ToolInfo version="2.3.1.4663"/>
+    <ToolInfo version="2.4.0.5972"/>
     <Devices>
         <Device mpn="CY8C6245AZI-S3D72">
             <BlockConfig>
@@ -388,7 +388,7 @@
                 </Block>
                 <Block location="pass[0].sar[0]">
                     <Alias value="SAR_ADC"/>
-                    <Personality template="mxs40sar" version="4.0">
+                    <Personality template="mxs40sar" version="5.0">
                         <Param id="vref_select" value="CY_SAR_VREF_SEL_EXT"/>
                         <Param id="vref_voltage" value="3.300"/>
                         <Param id="num_channels" value="2"/>
@@ -567,39 +567,15 @@
                         <Param id="divider" value="1"/>
                     </Personality>
                 </Block>
-                <Block location="srss[0].clock[0].fll[0]">
-                    <Personality template="mxs40fll" version="2.0">
-                        <Param id="configuration" value="auto"/>
-                        <Param id="desiredFrequency" value="50.000"/>
-                    </Personality>
-                </Block>
                 <Block location="srss[0].clock[0].hfclk[0]">
                     <Personality template="mxs40hfclk" version="1.1">
-                        <Param id="sourceClockNumber" value="0"/>
+                        <Param id="sourceClockNumber" value="1"/>
                         <Param id="divider" value="1"/>
                     </Personality>
                 </Block>
                 <Block location="srss[0].clock[0].hfclk[1]">
                     <Personality template="mxs40hfclk" version="1.1">
                         <Param id="sourceClockNumber" value="1"/>
-                        <Param id="divider" value="1"/>
-                    </Personality>
-                </Block>
-                <Block location="srss[0].clock[0].hfclk[2]">
-                    <Personality template="mxs40hfclk" version="1.1">
-                        <Param id="sourceClockNumber" value="1"/>
-                        <Param id="divider" value="2"/>
-                    </Personality>
-                </Block>
-                <Block location="srss[0].clock[0].hfclk[3]">
-                    <Personality template="mxs40hfclk" version="1.1">
-                        <Param id="sourceClockNumber" value="1"/>
-                        <Param id="divider" value="2"/>
-                    </Personality>
-                </Block>
-                <Block location="srss[0].clock[0].hfclk[4]">
-                    <Personality template="mxs40hfclk" version="1.1">
-                        <Param id="sourceClockNumber" value="0"/>
                         <Param id="divider" value="1"/>
                     </Personality>
                 </Block>
@@ -645,14 +621,14 @@
                 </Block>
                 <Block location="srss[0].clock[0].periclk[0]">
                     <Personality template="mxs40periclk" version="1.0">
-                        <Param id="divider" value="2"/>
+                        <Param id="divider" value="1"/>
                     </Personality>
                 </Block>
                 <Block location="srss[0].clock[0].pll[0]">
                     <Personality template="mxs40pll" version="2.0">
                         <Param id="lowFrequencyMode" value="false"/>
                         <Param id="configuration" value="auto"/>
-                        <Param id="desiredFrequency" value="50.000"/>
+                        <Param id="desiredFrequency" value="96.000"/>
                         <Param id="optimization" value="MinPower"/>
                     </Personality>
                 </Block>
@@ -669,7 +645,7 @@
                 </Block>
                 <Block location="srss[0].clock[0].timerclk[0]">
                     <Personality template="mxs40timerclk" version="1.0">
-                        <Param id="sourceClock" value="imo"/>
+                        <Param id="sourceClock" value="hfclk"/>
                         <Param id="hf0Div" value="1"/>
                         <Param id="timerDivider" value="1"/>
                     </Personality>
@@ -687,8 +663,8 @@
                 <Block location="srss[0].power[0]">
                     <Personality template="mxs40power" version="1.3">
                         <Param id="pwrMode" value="LDO_1_1"/>
-                        <Param id="actPwrMode" value="ULP"/>
-                        <Param id="coreRegulator" value="CY_SYSPM_BUCK_MODE_MIN"/>
+                        <Param id="actPwrMode" value="LP"/>
+                        <Param id="coreRegulator" value="CY_SYSPM_BUCK_MODE_NORMAL"/>
                         <Param id="pmicEnable" value="false"/>
                         <Param id="backupSrc" value="VDDD"/>
                         <Param id="idlePwrMode" value="CY_CFG_PWR_MODE_SLEEP"/>

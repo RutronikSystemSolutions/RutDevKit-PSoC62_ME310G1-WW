@@ -44,7 +44,7 @@ extern cyhal_rtc_t rtc_obj;
 
 /*Telit Portal Authentication Templates*/
 const char fcmd_HTTPPOST[] ="POST /api HTTP/1.0\r\nHost: api-de.devicewise.com\r\nContent-Type: application/json\r\nContent-Length:";
-const char fcmd_dW_auth[]  = "{\"auth\":{\"command\":\"api.authenticate\",\"params\":{\"appToken\":\"%s\",\"appId\":\"%s\",\"thingKey\":\"%s\"}}}\r\n";
+const char fcmd_dW_auth[]  = "{\"auth\":{\"command\":\"api.authenticate\",\"params\":{\"appToken\":\"%s\",\"appId\":\"%s\",\"thingKey\":\"%s\"}}}";
 const char fcmd_dw_post_auth[]  = "{\"auth\":{\"sessionId\":\"%s\"},";
 
 /*Telit Portal Post Templates*/
@@ -54,14 +54,15 @@ const char fcmd_dw_post_p3[]  = "\"3\":{\"command\":\"property.publish\",\"param
 const char fcmd_dw_post_p4[]  = "\"4\":{\"command\":\"property.publish\",\"params\":{\"thingKey\":\"%s\",\"key\":\"mag_xy\",\"value\":%d}},";
 const char fcmd_dw_post_p5[]  = "\"5\":{\"command\":\"property.publish\",\"params\":{\"thingKey\":\"%s\",\"key\":\"batt_voltage\",\"value\":%d}},";
 const char fcmd_dw_post_p6[]  = "\"6\":{\"command\":\"property.publish\",\"params\":{\"thingKey\":\"%s\",\"key\":\"signal_level\",\"value\":%d}},";
-const char fcmd_dw_post_p7[]  = "\"7\":{\"command\":\"location.publish\",\"params\":{\"thingKey\":\"%s\",\"lat\":%s,\"lng\":%s,\"altitude\":%s,\"heading\":%s,\"speed\":%s,\"fixType\":\"manual\",\"fixAcc\":%s}}}}\r\n";
+const char fcmd_dw_post_p6end[]  = "\"6\":{\"command\":\"property.publish\",\"params\":{\"thingKey\":\"%s\",\"key\":\"signal_level\",\"value\":%d}}}";
+const char fcmd_dw_post_p7[]  = "\"7\":{\"command\":\"location.publish\",\"params\":{\"thingKey\":\"%s\",\"lat\":%s,\"lng\":%s,\"altitude\":%s,\"heading\":%s,\"speed\":%s,\"fixType\":\"manual\",\"fixAcc\":%s}}}";
 
 /*App ID and tokens*/
 const char telit_appID[] = "5b542754447cfb36414b9b26";
 const char telit_appToken[] = "SFBhqftn43LdjcrF";
 
 /*Global variables for Telit cloud uploads*/
-char telit_sessionId[25];
+char telit_sessionId[48];
 char post_buff[CMD_BUFF_LENGTH];
 char post_length[16];
 
@@ -773,9 +774,8 @@ static _Bool TelitPortalAuthenticate(void)
 
     memset(post_buff, 0, sizeof(post_buff));
     memset(local_buff, 0, sizeof(local_buff));
-
-    /*Reset rx buffer for data reception*/
-    SCP_InitRx();
+    memset(post_length, 0, sizeof(post_length));
+    memset(telit_sessionId, 0, sizeof(telit_sessionId));
 
     /* Form data for lenght calculation*/
     sprintf(local_buff, fcmd_dW_auth, telit_appToken, telit_appID, modem_data.imei);
@@ -787,12 +787,17 @@ static _Bool TelitPortalAuthenticate(void)
     sprintf(post_buff, (char *)fcmd_HTTPPOST);
     strcat(post_buff,post_length);
     strcat(post_buff,local_buff);
+    strcat(post_buff,"\r\n");
+
+    /*Reset rx buffer for data reception*/
+    SCP_InitRx();
 
     /* Send HTTP POST data */
     SCP_SendData(post_buff, strlen(post_buff));
+    printf("\n\rAUTHENTICATE:\n\r%s\n\r", post_buff);
 
     /* Wait for full answer */
-    result = SCP_WaitForAnswer("}}}", 30000);
+    result = SCP_WaitForAnswer("}}}", 60000);
     if (result)
     {
         /* Getting session id */
@@ -801,23 +806,20 @@ static _Bool TelitPortalAuthenticate(void)
         if(result)
         {
             result += strlen("sessionId\":\"");
-            while ((*result != '\"')&& (i < SESSIONID_LENGTH))
+            while ((*result != '\"')&& (*result != 0))
             {
                 telit_sessionId[i++]=*(result++);
             }
-            if (i <= SESSIONID_LENGTH)
+            /* We should wait for the server to shut down the connection */
+            result = NULL;
+            result = SCP_WaitForAnswer("NO CARRIER", 30000);
+            if(result)
             {
-                /* We should wait for the server to shut down the connection */
-                result = NULL;
-                result = SCP_WaitForAnswer("NO CARRIER", 20000);
-                if(result)
-                {
-                    ModemCloseTcpSocket();
-                    printf("SessionID: ");
-                    printf(telit_sessionId);
-                    printf("\n\r");
-                    return true;
-                }
+                ModemCloseTcpSocket();
+                printf("SessionID: ");
+                printf(telit_sessionId);
+                printf("\n\r");
+                return true;
             }
         }
     }
@@ -829,7 +831,6 @@ static _Bool TelitPortalAuthenticate(void)
 static _Bool TelitPortalPostData(void)
 {
   char *result = NULL;
-  uint32_t len;
   char local_buff[1024];
   static float temperature = 0, humidity = 0, pressure = 0;
   static int mag_xy = 0;
@@ -841,10 +842,12 @@ static _Bool TelitPortalPostData(void)
   pressure++;
   mag_xy++;
 
+  /*Battery voltage*/
   batt_voltage = (int)(aADCdata[1]*ADC_VOLTAGE_COEFF);
 
   memset(post_buff, 0, sizeof(post_buff));
   memset(local_buff, 0, sizeof(local_buff));
+  memset(post_length, 0, sizeof(post_length));
 
   /*Copy variables that might to change during data post*/
   signal_level = modem_data.signal;
@@ -862,67 +865,41 @@ static _Bool TelitPortalPostData(void)
                || strlen(modem_data.gps_precision) == 0
                  )
   {
-    /* Calculate post length */
-    len =  strlen(fcmd_dw_post_auth) - 2;
-    len += strlen(fcmd_dw_post_p1) - 6;
-    len += strlen(fcmd_dw_post_p2) - 6;
-    len += strlen(fcmd_dw_post_p3) - 6;
-    len += strlen(fcmd_dw_post_p4) - 4;
-    len += strlen(fcmd_dw_post_p5) - 4;
-    len += strlen(fcmd_dw_post_p6) - 4;
 
-    /* Calculate parameters length */
-    sprintf(
-            (char *)post_buff,"%s%s%s%s%s%s%s%.2f%.2f%.2f%d%d%d",
-            telit_sessionId,
-            modem_data.imei,
-            modem_data.imei,
-            modem_data.imei,
-            modem_data.imei,
-            modem_data.imei,
-            modem_data.imei,
-            temperature,
-            pressure,
-            humidity,
-            mag_xy,
-            batt_voltage,
-            signal_level
-              );
+	/* Generate JSON post */
+	memset(post_buff, 0, sizeof(post_buff));
+	sprintf((char *)post_buff, fcmd_dw_post_auth, telit_sessionId);
+	strcat(local_buff,post_buff);
 
-    len += strlen((char *)post_buff);
+	memset(post_buff, 0, sizeof(post_buff));
+	sprintf((char *)post_buff, fcmd_dw_post_p1, modem_data.imei, temperature);
+	strcat(local_buff,post_buff);
 
-    /*Generate full HTTP post*/
-    memset(post_buff, 0, sizeof(post_buff));
+	memset(post_buff, 0, sizeof(post_buff));
+	sprintf((char *)post_buff, fcmd_dw_post_p2, modem_data.imei, pressure);
+	strcat(local_buff,post_buff);
+
+	memset(post_buff, 0, sizeof(post_buff));
+	sprintf((char *)post_buff, fcmd_dw_post_p3, modem_data.imei, humidity);
+	strcat(local_buff,post_buff);
+
+	memset(post_buff, 0, sizeof(post_buff));
+	sprintf((char *)post_buff, fcmd_dw_post_p4, modem_data.imei, mag_xy);
+	strcat(local_buff,post_buff);
+
+	memset(post_buff, 0, sizeof(post_buff));
+	sprintf((char *)post_buff, fcmd_dw_post_p5, modem_data.imei, batt_voltage);
+	strcat(local_buff,post_buff);
+
+	memset(post_buff, 0, sizeof(post_buff));
+	sprintf((char *)post_buff, fcmd_dw_post_p6end, modem_data.imei, signal_level);
+	strcat(local_buff,post_buff);
+
+    /*Generate HTTP post*/
+	memset(post_buff, 0, sizeof(post_buff));
     sprintf(post_buff, (char *)fcmd_HTTPPOST);
-    sprintf((char *)local_buff,"%d\r\n\r\n", (int)len);
-    strcat(post_buff,local_buff);
-
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_auth, telit_sessionId);
-    strcat(post_buff,local_buff);
-
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p1, modem_data.imei, temperature);
-    strcat(post_buff,local_buff);
-
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p2, modem_data.imei, pressure);
-    strcat(post_buff,local_buff);
-
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p3, modem_data.imei, humidity);
-    strcat(post_buff,local_buff);
-
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p4, modem_data.imei, mag_xy);
-    strcat(post_buff,local_buff);
-
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p5, modem_data.imei, batt_voltage);
-    strcat(post_buff,local_buff);
-
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p6, modem_data.imei, signal_level);
+    sprintf(post_length, "%d\r\n\r\n", strlen(local_buff));
+    strcat(post_buff,post_length);
     strcat(post_buff,local_buff);
     strcat(post_buff,"\r\n");
 
@@ -931,12 +908,12 @@ static _Bool TelitPortalPostData(void)
     printf("\n\rUPLOADING:\n\r%s\n\r", post_buff);
     vTaskDelay(pdMS_TO_TICKS(1000));
 
-    result = SCP_WaitForAnswer("}}", 30000);
+    result = SCP_WaitForAnswer("}}", 60000);
     if (result)
     {
       /* We should wait for the server to shut down the connection */
       result = NULL;
-      result = SCP_WaitForAnswer("NO CARRIER", 20000);
+      result = SCP_WaitForAnswer("NO CARRIER", 30000);
       if(result)
       {
         ModemCloseTcpSocket();
@@ -948,79 +925,37 @@ static _Bool TelitPortalPostData(void)
   /*Include GNSS data*/
   else
   {
-    /* Calculate post length */
-    len =  strlen(fcmd_dw_post_auth) - 2;
-    len += strlen(fcmd_dw_post_p1) - 6;
-    len += strlen(fcmd_dw_post_p2) - 6;
-    len += strlen(fcmd_dw_post_p3) - 6;
-    len += strlen(fcmd_dw_post_p4) - 4;
-    len += strlen(fcmd_dw_post_p5) - 4;
-    len += strlen(fcmd_dw_post_p6) - 4;
-    len += strlen(fcmd_dw_post_p7) - 14;
+	  /* Generate JSON post */
+	  memset(post_buff, 0, sizeof(post_buff));
+	  sprintf((char *)post_buff, fcmd_dw_post_auth, telit_sessionId);
+	  strcat(local_buff,post_buff);
 
-    /* Calculate parameters length */
-    sprintf(
-            (char *)post_buff,"%s%s%s%s%s%s%s%.2f%.2f%.2f%d%d%d%s%s%s%s%s%s%s",
-            telit_sessionId,
-            modem_data.imei,
-            modem_data.imei,
-            modem_data.imei,
-            modem_data.imei,
-            modem_data.imei,
-            modem_data.imei,
-            temperature,
-            pressure,
-            humidity,
-            mag_xy,
-            batt_voltage,
-            signal_level,
-            modem_data.imei,
-            modem_data.gps_latitude,
-            modem_data.gps_longitude,
-            modem_data.gps_altitude,
-            modem_data.gps_course,
-            modem_data.gps_speed,
-            modem_data.gps_precision
-              );
+	  memset(post_buff, 0, sizeof(post_buff));
+	  sprintf((char *)post_buff, fcmd_dw_post_p1, modem_data.imei, temperature);
+	  strcat(local_buff,post_buff);
 
-    len += strlen((char *)post_buff);
+	  memset(post_buff, 0, sizeof(post_buff));
+	  sprintf((char *)post_buff, fcmd_dw_post_p2, modem_data.imei, pressure);
+	  strcat(local_buff,post_buff);
 
-    /*Generate full HTTP post*/
-    memset(post_buff, 0, sizeof(post_buff));
-    sprintf(post_buff, (char *)fcmd_HTTPPOST);
-    sprintf((char *)local_buff,"%d\r\n\r\n", (int)len);
-    strcat(post_buff,local_buff);
+	  memset(post_buff, 0, sizeof(post_buff));
+	  sprintf((char *)post_buff, fcmd_dw_post_p3, modem_data.imei, humidity);
+	  strcat(local_buff,post_buff);
 
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_auth, telit_sessionId);
-    strcat(post_buff,local_buff);
+	  memset(post_buff, 0, sizeof(post_buff));
+	  sprintf((char *)post_buff, fcmd_dw_post_p4, modem_data.imei, mag_xy);
+	  strcat(local_buff,post_buff);
 
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p1, modem_data.imei, temperature);
-    strcat(post_buff,local_buff);
+	  memset(post_buff, 0, sizeof(post_buff));
+	  sprintf((char *)post_buff, fcmd_dw_post_p5, modem_data.imei, batt_voltage);
+	  strcat(local_buff,post_buff);
 
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p2, modem_data.imei, pressure);
-    strcat(post_buff,local_buff);
+	  memset(post_buff, 0, sizeof(post_buff));
+	  sprintf((char *)post_buff, fcmd_dw_post_p6, modem_data.imei, signal_level);
+	  strcat(local_buff,post_buff);
 
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p3, modem_data.imei, humidity);
-    strcat(post_buff,local_buff);
-
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p4, modem_data.imei, mag_xy);
-    strcat(post_buff,local_buff);
-
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p5, modem_data.imei, batt_voltage);
-    strcat(post_buff,local_buff);
-
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff, fcmd_dw_post_p6, modem_data.imei, signal_level);
-    strcat(post_buff,local_buff);
-
-    memset(local_buff, 0, sizeof(local_buff));
-    sprintf((char *)local_buff,
+	  memset(post_buff, 0, sizeof(post_buff));
+	  sprintf((char *)post_buff,
             fcmd_dw_post_p7,
             modem_data.imei,
             modem_data.gps_latitude,
@@ -1029,25 +964,33 @@ static _Bool TelitPortalPostData(void)
             modem_data.gps_course,
             modem_data.gps_speed,
             modem_data.gps_precision);
-    strcat(post_buff,local_buff);
+	  strcat(local_buff,post_buff);
 
-    /* Send HTTP POST data */
-    SCP_SendData((char *)post_buff, strlen(post_buff));
-    printf("\n\rUPLOADING:\n\r%s\n\r", post_buff);
-    vTaskDelay(pdMS_TO_TICKS(1000));
+	  /*Generate HTTP post*/
+      memset(post_buff, 0, sizeof(post_buff));
+	  sprintf(post_buff, (char *)fcmd_HTTPPOST);
+	  sprintf(post_length, "%d\r\n\r\n", strlen(local_buff));
+	  strcat(post_buff,post_length);
+	  strcat(post_buff,local_buff);
+	  strcat(post_buff,"\r\n");
 
-    result = SCP_WaitForAnswer("}}",20000);
-    if (result)
-    {
-      /* We should wait for the server to shut down the connection */
-      result = NULL;
-      result = SCP_WaitForAnswer("NO CARRIER", 20000);
-      if(result)
+	  /* Send HTTP POST data */
+	  SCP_SendData((char *)post_buff, strlen(post_buff));
+	  printf("\n\rUPLOADING:\n\r%s\n\r", post_buff);
+	  vTaskDelay(pdMS_TO_TICKS(1000));
+
+      result = SCP_WaitForAnswer("}}",60000);
+      if (result)
       {
-        ModemCloseTcpSocket();
-        return true;
+        /* We should wait for the server to shut down the connection */
+        result = NULL;
+        result = SCP_WaitForAnswer("NO CARRIER", 30000);
+        if(result)
+        {
+          ModemCloseTcpSocket();
+          return true;
+        }
       }
-    }
   }
 
   /*Timeout. In case of error, no }} received*/
@@ -1144,13 +1087,18 @@ upload_error_t TelitCloudUpload(void)
   }
 
   /*Set APN*/
-  if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+CGDCONT?\r\n", "lpwa.telia.iot", 1000, 1);
-  if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+CGDCONT=1,\"IP\",\"lpwa.telia.iot\"\r\n", "OK", 2000, 1);
+  if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+CGDCONT?\r\n", "omnitel", 1000, 1);
+  if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+CGDCONT=1,\"IP\",\"omnitel\"\r\n", "OK", 2000, 1);
+  //if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+CGDCONT?\r\n", "lpwa.telia.iot", 1000, 1);
+  //if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+CGDCONT=1,\"IP\",\"lpwa.telia.iot\"\r\n", "OK", 2000, 1);
 
   /*Network Support Setup*/
-  if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46?\r\n", "+WS46: 28", 1000, 1);
-  if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46=28\r\n", "OK", 1000, 1);
-  if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT#WS46?\r\n", "#WS46: 3", 1000, 1);
+  //if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46?\r\n", "+WS46: 28", 1000, 1);
+  //if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46=28\r\n", "OK", 1000, 1);
+  //if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT#WS46?\r\n", "#WS46: 3", 1000, 1);
+
+  if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46?\r\n", "+WS46: 12", 1000, 1);
+  if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46=12\r\n", "OK", 1000, 1);
   if (!scp_result)
   {
     scp_result = SCP_SendCommandWaitAnswer("AT#WS46=3\r\n", "OK", 1000, 1);
@@ -1314,8 +1262,8 @@ static gnss_error_t GNSSFixLocation(uint32_t timeout, char*lat, char*lon, char*s
 	    }
 	  }
 
-	  /*Set WWAN priority to GNSS priority*/
-	  if (result) result = SCP_SendCommandWaitAnswer("AT$GPSCFG?\r\n", "GPSCFG: 0,1,1,0", 1000, 1);
+	  /*Set GNSS priority*/
+	  if (result) result = SCP_SendCommandWaitAnswer("AT$GPSCFG?\r\n", "$GPSCFG: 0", 1000, 1);
 	  if (!result)
 		  {
 		  	SCP_SendCommandWaitAnswer("AT$GPSCFG=0,0\r\n", "OK", 1000, 1);
@@ -1689,7 +1637,7 @@ void ModemTask(void *param)
       memset(modem_data.gps_speed,0x00,sizeof(modem_data.gps_speed));
 
       /*Try to catch the GNSS signal, */
-      GNSSFixLocation(60,modem_data.gps_latitude,modem_data.gps_longitude,modem_data.gps_speed,modem_data.gps_course, modem_data.gps_altitude, modem_data.gps_precision);
+      //GNSSFixLocation(240,modem_data.gps_latitude,modem_data.gps_longitude,modem_data.gps_speed,modem_data.gps_course, modem_data.gps_altitude, modem_data.gps_precision);
 
       printf("Latitude %s\n\r", modem_data.gps_latitude);
       printf("Longitude %s\n\r", modem_data.gps_longitude);
@@ -1723,7 +1671,7 @@ void URCReceiverTask(void *param)
     SCP_AddCallback("RING", IncomingCall);
 
     /*Start Modem Task*/
-    xTaskCreate(ModemTask, "modem task", configMINIMAL_STACK_SIZE*32, NULL, configMAX_PRIORITIES - 3, &ModemTaskHandle);
+    xTaskCreate(ModemTask, "modem task", configMINIMAL_STACK_SIZE*64, NULL, configMAX_PRIORITIES - 3, &ModemTaskHandle);
     if(ModemTaskHandle == NULL)
     {
     	printf("Error: could not create main_task.\r\n");

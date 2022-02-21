@@ -11,7 +11,7 @@
 #define true							1
 #define false							0
 #define CMD_BUFF_LENGTH                 1024
-#define SESSIONID_LENGTH                24
+#define SESSIONID_LENGTH                32
 #define TELIT_CLOUD_UPDATE_INTERVAL     600     //time interval for modem properties
 #define PWRONLVL                        1000    //power on indication ADC value
 #define WAIT_FOR_NETWORK_S              300     //wait for network in seconds
