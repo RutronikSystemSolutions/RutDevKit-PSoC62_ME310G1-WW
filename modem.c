@@ -58,8 +58,9 @@ const char fcmd_dw_post_p6end[]  = "\"6\":{\"command\":\"property.publish\",\"pa
 const char fcmd_dw_post_p7[]  = "\"7\":{\"command\":\"location.publish\",\"params\":{\"thingKey\":\"%s\",\"lat\":%s,\"lng\":%s,\"altitude\":%s,\"heading\":%s,\"speed\":%s,\"fixType\":\"manual\",\"fixAcc\":%s}}}";
 
 /*App ID and tokens*/
-const char telit_appID[] = "5b542754447cfb36414b9b26";
-const char telit_appToken[] = "SFBhqftn43LdjcrF";
+#warning "Please define a telit cloud application ID and application Token here"
+const char telit_appID[] = "xxx";
+const char telit_appToken[] = "yyy";
 
 /*Global variables for Telit cloud uploads*/
 char telit_sessionId[48];
