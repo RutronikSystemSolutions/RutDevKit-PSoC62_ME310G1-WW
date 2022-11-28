@@ -1015,6 +1015,9 @@ upload_error_t TelitCloudUpload(void)
     goto error_exit;
   }
 
+  /*Needs longer period to get ready?*/
+  vTaskDelay(pdMS_TO_TICKS(5000));
+
   /*Start AT Commands*/
   scp_result = SCP_SendCommandWaitAnswer("AT\r\n", "OK", 200, 1);
 
@@ -1088,19 +1091,22 @@ upload_error_t TelitCloudUpload(void)
   }
 
   /*Set APN*/
+#warning "Correct APN must be set."
   if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+CGDCONT?\r\n", "omnitel", 1000, 1);
   if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+CGDCONT=1,\"IP\",\"omnitel\"\r\n", "OK", 2000, 1);
   //if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+CGDCONT?\r\n", "lpwa.telia.iot", 1000, 1);
   //if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+CGDCONT=1,\"IP\",\"lpwa.telia.iot\"\r\n", "OK", 2000, 1);
 
-  /*Network Support Setup*/
   //if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46?\r\n", "+WS46: 28", 1000, 1);
   //if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46=28\r\n", "OK", 1000, 1);
-  //if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT#WS46?\r\n", "#WS46: 3", 1000, 1);
 
-  if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46?\r\n", "+WS46: 12", 1000, 1);
-  if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46=12\r\n", "OK", 1000, 1);
-  if (!scp_result)
+  //if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46?\r\n", "+WS46: 12", 1000, 1);
+  //if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46=12\r\n", "OK", 1000, 1);
+
+  /*Network Support Setup*/
+  if (scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46?\r\n", "+WS46: 28", 1000, 1);
+  if (!scp_result) scp_result = SCP_SendCommandWaitAnswer("AT+WS46=28\r\n", "OK", 1000, 1);
+  if (scp_result)
   {
     scp_result = SCP_SendCommandWaitAnswer("AT#WS46=3\r\n", "OK", 1000, 1);
     if(!scp_result)
@@ -1638,7 +1644,7 @@ void ModemTask(void *param)
       memset(modem_data.gps_speed,0x00,sizeof(modem_data.gps_speed));
 
       /*Try to catch the GNSS signal, */
-      //GNSSFixLocation(240,modem_data.gps_latitude,modem_data.gps_longitude,modem_data.gps_speed,modem_data.gps_course, modem_data.gps_altitude, modem_data.gps_precision);
+      GNSSFixLocation(240,modem_data.gps_latitude,modem_data.gps_longitude,modem_data.gps_speed,modem_data.gps_course, modem_data.gps_altitude, modem_data.gps_precision);
 
       printf("Latitude %s\n\r", modem_data.gps_latitude);
       printf("Longitude %s\n\r", modem_data.gps_longitude);

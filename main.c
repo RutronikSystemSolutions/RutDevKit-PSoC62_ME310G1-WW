@@ -150,7 +150,7 @@ int main(void)
     if (result != CY_RSLT_SUCCESS)
     {handle_error();}
     printf("\x1b[2J\x1b[;H");
-    printf("RutDevKit-PSoC62 ME310G1-WW Application.\r\n");
+    printf("RDK2 ME310G1-WW Application.\r\n");
 
     /* Initialize RTC */
     result = cyhal_rtc_init(&rtc_obj);
